@@ -227,7 +227,8 @@ export const AuthProvider = ({ children }) => {
   // Firebase Auth State Listener
   useEffect(() => {
     if (!isFirebaseConfigured || !auth) {
-      loginDemoUser('student');
+      setUser(null);
+      setProfile(null);
       setLoading(false);
       return;
     }
@@ -237,7 +238,9 @@ export const AuthProvider = ({ children }) => {
         setUser(firebaseUser);
         await fetchUserProfile(firebaseUser.uid);
       } else {
-        loginDemoUser('student');
+        setUser(null);
+        setProfile(null);
+        setUserSubmissions([]);
       }
       setLoading(false);
     });
