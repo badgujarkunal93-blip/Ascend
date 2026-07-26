@@ -11,11 +11,8 @@ export const STARTER_TEMPLATES = {
 using namespace std;
 
 int main() {
-    // Read input from stdin
-    int a, b;
-    if (cin >> a >> b) {
-        cout << (a + b) << endl;
-    }
+    // Write your code here
+    
     return 0;
 }`,
   java: `import java.util.Scanner;
@@ -23,21 +20,15 @@ int main() {
 public class Main {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
-        if (scanner.hasNextInt()) {
-            int a = scanner.nextInt();
-            int b = scanner.nextInt();
-            System.out.println(a + b);
-        }
+        // Write your code here
+        
     }
 }`,
   python: `import sys
 
 def main():
-    lines = sys.stdin.read().split()
-    if len(lines) >= 2:
-        a = int(lines[0])
-        b = int(lines[1])
-        print(a + b)
+    # Write your code here
+    pass
 
 if __name__ == "__main__":
     main()
