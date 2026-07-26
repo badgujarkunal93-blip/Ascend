@@ -170,32 +170,6 @@ export default function AuthPage() {
             </button>
           </form>
 
-          {/* Quick Demo Test Buttons */}
-          <div className="pt-4 border-t border-[#21262D] text-center space-y-3 font-mono">
-            <div className="text-[11px] text-[#7D8590]">
-              // DEMO_TEST_PROFILES
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleDemoSignIn('student')}
-                className="py-1.5 px-2 rounded bg-[#161B22] hover:bg-[#12161B] text-[#3FB950] text-xs border border-[#3FB950]/30 flex items-center justify-center space-x-1 transition-colors font-bold"
-              >
-                <UserCheck className="w-3.5 h-3.5" />
-                <span>[STUDENT]</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleDemoSignIn('admin')}
-                className="py-1.5 px-2 rounded bg-[#161B22] hover:bg-[#12161B] text-[#C87DE8] text-xs border border-[#C87DE8]/30 flex items-center justify-center space-x-1 transition-colors font-bold"
-              >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>[ADMIN]</span>
-              </button>
-            </div>
-          </div>
-
         </div>
       </div>
     </div>
