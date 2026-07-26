@@ -26,7 +26,7 @@ export default function DashboardPage() {
   };
 
   const isQuestionPassed = (questionId) => {
-    return userSubmissions.some(s => s.question_id === questionId && s.verdict === 'pass');
+    return (userSubmissions || []).some(s => s.question_id === questionId && s.verdict === 'pass');
   };
 
   if (loading) {

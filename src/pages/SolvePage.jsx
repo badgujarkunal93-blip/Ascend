@@ -14,7 +14,7 @@ import {
 export default function SolvePage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { questionsList, recordSubmission, showToast } = useAuth();
+  const { questionsList, recordSubmission, userSubmissions, showToast } = useAuth();
 
   const question = questionsList.find(q => q.id === id);
 
