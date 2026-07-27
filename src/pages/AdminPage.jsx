@@ -4,36 +4,49 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { 
   Plus, Trash2, Edit3, ShieldCheck, PlusCircle, Check, Eye, EyeOff, 
-  BookOpen, AlertTriangle, X, Users, UserX, Clock, Sparkles
+  BookOpen, AlertTriangle, X, Users, UserX, Clock, Building2, Globe
 } from 'lucide-react';
 
 export default function AdminPage() {
   const { 
-    questionsList, addQuestion, updateQuestion, deleteQuestion, 
-    studentRoster, fetchStudentRoster, removeStudent, showToast 
+    profile, questionsList, addQuestion, updateQuestion, deleteQuestion, 
+    institutionsList, addInstitution, studentRoster, fetchStudentRoster, 
+    removeStudent, showToast 
   } = useAuth();
+
+  const isSuperAdmin = profile?.role === 'superadmin';
+  const isInstitutionAdmin = profile?.role === 'institution_admin' || profile?.role === 'admin' || isSuperAdmin;
 
   const todayStr = new Date().toISOString().split('T')[0];
 
-  const [activeTab, setActiveTab] = useState('questions'); // 'questions' | 'roster'
+  // Tabs: 'questions' | 'roster' | 'institutions'
+  const [activeTab, setActiveTab] = useState(isSuperAdmin ? 'questions' : 'roster');
+  
+  // Question Manager State
   const [editingId, setEditingId] = useState(null);
   const [title, setTitle] = useState('');
   const [difficulty, setDifficulty] = useState('medium');
   const [postedDate, setPostedDate] = useState(todayStr);
   const [description, setDescription] = useState('');
   const [showPreview, setShowPreview] = useState(false);
-  const [testCases, setTestCases] = useState([
-    { input: '', expected_output: '' }
-  ]);
-
+  const [testCases, setTestCases] = useState([{ input: '', expected_output: '' }]);
   const [deletingQuestion, setDeletingQuestion] = useState(null);
+
+  // Institution Manager State (Superadmin)
+  const [newInstName, setNewInstName] = useState('');
+  const [newInstDomain, setNewInstDomain] = useState('');
+  const [isAddingInst, setIsAddingInst] = useState(false);
+
+  // Roster Filter State
+  const [selectedInstFilter, setSelectedInstFilter] = useState(profile?.institution_id || '');
   const [deletingStudent, setDeletingStudent] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    fetchStudentRoster();
-  }, []);
+    fetchStudentRoster(selectedInstFilter || profile?.institution_id);
+  }, [selectedInstFilter, profile]);
 
+  // Question Handlers
   const handleStartEdit = (q) => {
     setEditingId(q.id);
     setTitle(q.title);
@@ -71,7 +84,7 @@ export default function AdminPage() {
   const handleSubmitQuestion = async (e) => {
     e.preventDefault();
     if (!title || !description || testCases.some(tc => !tc.input.trim() || !tc.expected_output.trim())) {
-      showToast('Please fill out all title, description, and test case fields.', 'error');
+      showToast('Please fill out title, description, and test case fields.', 'error');
       return;
     }
 
@@ -109,7 +122,27 @@ export default function AdminPage() {
     }
   };
 
-  const confirmDelete = async () => {
+  // Institution Handler (Superadmin)
+  const handleAddInstitutionSubmit = async (e) => {
+    e.preventDefault();
+    if (!newInstName.trim() || !newInstDomain.trim()) {
+      showToast('College name and email domain are required.', 'error');
+      return;
+    }
+
+    setIsAddingInst(true);
+    try {
+      await addInstitution(newInstName, newInstDomain);
+      setNewInstName('');
+      setNewInstDomain('');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsAddingInst(false);
+    }
+  };
+
+  const confirmDeleteQuestion = async () => {
     if (!deletingQuestion) return;
     await deleteQuestion(deletingQuestion.id);
     setDeletingQuestion(null);
@@ -150,35 +183,41 @@ export default function AdminPage() {
     }
   };
 
+  const userInst = institutionsList.find(i => i.id === profile?.institution_id) || institutionsList[0];
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 font-mono">
       
       {/* Header & Tabs */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#21262D] pb-4">
         <div>
-          <div className="text-xs text-[#C87DE8]">// INSTRUCTOR_CONTROL_ROOM</div>
+          <div className="text-xs text-[#C87DE8]">
+            // {isSuperAdmin ? 'GLOBAL_SUPERADMIN_CONSOLE' : 'INSTITUTION_ADMIN_PANEL'}
+          </div>
           <h1 className="text-2xl font-bold text-[#E6EDF3] tracking-tight">
-            Admin Management Console
+            {isSuperAdmin ? 'Superadmin Control Room' : `${userInst?.name || 'College'} Admin Console`}
           </h1>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex bg-[#12161B] p-1 rounded border border-[#21262D] text-xs">
-          <button
-            onClick={() => setActiveTab('questions')}
-            className={`px-4 py-1.5 rounded transition-all flex items-center space-x-1.5 ${
-              activeTab === 'questions' 
-                ? 'bg-[#3FB950] text-[#0B0E11] font-bold' 
-                : 'text-[#7D8590] hover:text-[#E6EDF3]'
-            }`}
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>// QUESTION_MANAGER ({questionsList.length})</span>
-          </button>
+        <div className="flex flex-wrap bg-[#12161B] p-1 rounded border border-[#21262D] text-xs">
+          {isSuperAdmin && (
+            <button
+              onClick={() => setActiveTab('questions')}
+              className={`px-3 py-1.5 rounded transition-all flex items-center space-x-1.5 ${
+                activeTab === 'questions' 
+                  ? 'bg-[#3FB950] text-[#0B0E11] font-bold' 
+                  : 'text-[#7D8590] hover:text-[#E6EDF3]'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>// QUESTION_BANK ({questionsList.length})</span>
+            </button>
+          )}
 
           <button
-            onClick={() => { setActiveTab('roster'); fetchStudentRoster(); }}
-            className={`px-4 py-1.5 rounded transition-all flex items-center space-x-1.5 ${
+            onClick={() => { setActiveTab('roster'); fetchStudentRoster(selectedInstFilter); }}
+            className={`px-3 py-1.5 rounded transition-all flex items-center space-x-1.5 ${
               activeTab === 'roster' 
                 ? 'bg-[#C87DE8] text-[#0B0E11] font-bold' 
                 : 'text-[#7D8590] hover:text-[#E6EDF3]'
@@ -187,6 +226,20 @@ export default function AdminPage() {
             <Users className="w-3.5 h-3.5" />
             <span>// STUDENT_ROSTER ({studentRoster.length})</span>
           </button>
+
+          {isSuperAdmin && (
+            <button
+              onClick={() => setActiveTab('institutions')}
+              className={`px-3 py-1.5 rounded transition-all flex items-center space-x-1.5 ${
+                activeTab === 'institutions' 
+                  ? 'bg-[#4FA8E0] text-[#0B0E11] font-bold' 
+                  : 'text-[#7D8590] hover:text-[#E6EDF3]'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>// INSTITUTIONS ({institutionsList.length})</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -205,7 +258,7 @@ export default function AdminPage() {
             </div>
 
             <p className="text-xs text-[#E6EDF3] font-sans">
-              Delete problem <span className="font-mono font-bold text-[#F85149]">"{deletingQuestion.title}"</span>? This will permanently erase it from student dashboards.
+              Delete question <span className="font-mono font-bold text-[#F85149]">"{deletingQuestion.title}"</span>? This will remove it from all college dashboards.
             </p>
 
             <div className="flex items-center justify-end space-x-3 pt-2">
@@ -216,7 +269,7 @@ export default function AdminPage() {
                 [CANCEL]
               </button>
               <button
-                onClick={confirmDelete}
+                onClick={confirmDeleteQuestion}
                 className="px-3 py-1.5 rounded bg-[#F85149] text-[#0B0E11] text-xs font-bold"
               >
                 [DELETE_NOW]
@@ -242,7 +295,7 @@ export default function AdminPage() {
 
             <div className="space-y-2 text-xs font-sans text-[#E6EDF3]">
               <p>
-                Are you sure you want to remove <span className="font-mono font-bold text-[#F85149]">{deletingStudent.full_name} ({deletingStudent.email})</span> from the programme?
+                Remove student <span className="font-mono font-bold text-[#F85149]">{deletingStudent.full_name} ({deletingStudent.email})</span> from the programme?
               </p>
               <p className="text-[#7D8590] font-mono text-[11px] bg-[#161B22] p-2.5 rounded border border-[#21262D]">
                 Reason: Student has skipped practice for 3+ consecutive days.
@@ -260,22 +313,22 @@ export default function AdminPage() {
                 onClick={confirmRemoveStudent}
                 className="px-3 py-1.5 rounded bg-[#F85149] text-[#0B0E11] text-xs font-bold"
               >
-                [REMOVE_STUDENT]
+                [DROP_STUDENT]
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* TAB 1: QUESTION MANAGER */}
-      {activeTab === 'questions' && (
+      {/* TAB 1: QUESTION MANAGER (SUPERADMIN ONLY) */}
+      {activeTab === 'questions' && isSuperAdmin && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* Creation Form */}
+          {/* Question Creation Form */}
           <div className="lg:col-span-7 space-y-6">
             <div className="judge-card p-6 space-y-5">
               <div className="text-xs text-[#7D8590]">
-                {editingId ? '// EDIT_PROBLEM_DEFINITION' : '// NEW_PROBLEM_ENTRY'}
+                {editingId ? '// EDIT_GLOBAL_QUESTION' : '// NEW_GLOBAL_QUESTION_ENTRY'}
               </div>
 
               <form onSubmit={handleSubmitQuestion} className="space-y-4 text-xs">
@@ -402,7 +455,7 @@ export default function AdminPage() {
                     disabled={isSubmitting}
                     className="flex-1 py-2 rounded bg-[#3FB950] text-[#0B0E11] font-bold text-xs hover:bg-[#3FB950]/90 transition-colors"
                   >
-                    {editingId ? '[UPDATE_QUESTION]' : '[PUBLISH_QUESTION]'}
+                    {editingId ? '[UPDATE_QUESTION]' : '[PUBLISH_GLOBAL_QUESTION]'}
                   </button>
                   {editingId && (
                     <button
@@ -419,9 +472,9 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Existing Questions Data Table */}
+          {/* Published Questions List */}
           <div className="lg:col-span-5 space-y-4">
-            <div className="text-xs text-[#7D8590]">// PUBLISHED_PROBLEMS ({questionsList.length})</div>
+            <div className="text-xs text-[#7D8590]">// GLOBAL_QUESTION_BANK ({questionsList.length})</div>
 
             <div className="space-y-3 max-h-[750px] overflow-y-auto pr-1">
               {questionsList.map((q) => (
@@ -455,7 +508,7 @@ export default function AdminPage() {
 
                   <div className="text-[11px] text-[#7D8590] pt-1 border-t border-[#21262D] flex justify-between">
                     <span>{q.test_cases?.length || 0} cases</span>
-                    <span className="text-[#3FB950]">[PUBLISHED]</span>
+                    <span className="text-[#3FB950]">[LIVE_ALL_INSTITUTIONS]</span>
                   </div>
                 </div>
               ))}
@@ -471,14 +524,28 @@ export default function AdminPage() {
           
           <div className="judge-card p-4 border border-[#21262D] flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-xs text-[#7D8590] font-mono">
-              <span className="text-[#E6EDF3] font-bold">// INACTIVITY_POLICY:</span> Students who skip daily problem solving for <span className="text-[#F85149] font-bold">3 consecutive days</span> are flagged for removal from the programme.
+              <span className="text-[#E6EDF3] font-bold">// SCOPED_INACTIVITY_POLICY:</span> Students skipping practice for <span className="text-[#F85149] font-bold">3 consecutive days</span> are flagged for removal from your college's batch.
             </div>
-            <button
-              onClick={fetchStudentRoster}
-              className="px-3 py-1.5 rounded bg-[#161B22] border border-[#21262D] hover:border-[#30363D] text-xs font-mono text-[#C87DE8] shrink-0"
-            >
-              [refresh_roster]
-            </button>
+
+            {/* Filter by Institution if Superadmin */}
+            {isSuperAdmin && (
+              <div className="flex items-center space-x-2">
+                <span className="text-xs text-[#7D8590]">filter_college:</span>
+                <select
+                  value={selectedInstFilter}
+                  onChange={(e) => {
+                    setSelectedInstFilter(e.target.value);
+                    fetchStudentRoster(e.target.value);
+                  }}
+                  className="bg-[#0B0E11] border border-[#21262D] rounded px-2.5 py-1 text-xs text-[#E6EDF3] focus:outline-none focus:border-[#C87DE8]"
+                >
+                  <option value="">All Colleges</option>
+                  {institutionsList.map(inst => (
+                    <option key={inst.id} value={inst.id}>{inst.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           <div className="judge-card p-6 space-y-4">
@@ -495,9 +562,9 @@ export default function AdminPage() {
                   <tr className="border-b border-[#21262D] text-[#7D8590]">
                     <th className="pb-3 font-semibold">STUDENT</th>
                     <th className="pb-3 font-semibold">EMAIL</th>
+                    <th className="pb-3 font-semibold">INSTITUTION</th>
                     <th className="pb-3 font-semibold">SOLVED</th>
                     <th className="pb-3 font-semibold">STREAK</th>
-                    <th className="pb-3 font-semibold">LAST ACTIVE</th>
                     <th className="pb-3 font-semibold">INACTIVITY STATUS</th>
                     <th className="pb-3 font-semibold text-right">ACTION</th>
                   </tr>
@@ -505,6 +572,7 @@ export default function AdminPage() {
                 <tbody className="divide-y divide-[#21262D]/60">
                   {studentRoster.map(student => {
                     const info = getInactivityInfo(student.last_pass_date);
+                    const studentInst = institutionsList.find(i => i.id === student.institution_id);
                     return (
                       <tr key={student.id} className="hover:bg-[#161B22]/50 transition-colors">
                         <td className="py-3.5 font-bold text-[#E6EDF3]">
@@ -513,14 +581,14 @@ export default function AdminPage() {
                         <td className="py-3.5 text-[#7D8590]">
                           {student.email}
                         </td>
+                        <td className="py-3.5 text-[#7D8590]">
+                          {studentInst?.name || 'Default College'}
+                        </td>
                         <td className="py-3.5 text-[#4FA8E0] font-bold">
                           {student.solved_count || 0} solved
                         </td>
                         <td className="py-3.5 text-[#3FB950] font-bold">
                           {student.streak_count || 0}D
-                        </td>
-                        <td className="py-3.5 text-[#7D8590]">
-                          {student.last_pass_date || 'Never'}
                         </td>
                         <td className="py-3.5">
                           <span className={`px-2 py-0.5 rounded text-[11px] font-bold border ${info.bg} ${info.color}`}>
@@ -540,6 +608,86 @@ export default function AdminPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* TAB 3: INSTITUTION MANAGER (SUPERADMIN ONLY) */}
+      {activeTab === 'institutions' && isSuperAdmin && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          {/* Onboard New College Form */}
+          <div className="lg:col-span-5 space-y-6">
+            <div className="judge-card p-6 space-y-5">
+              <div className="flex items-center space-x-2 text-xs font-bold text-[#4FA8E0]">
+                <Building2 className="w-4 h-4" />
+                <span>// ONBOARD_NEW_COLLEGE</span>
+              </div>
+
+              <form onSubmit={handleAddInstitutionSubmit} className="space-y-4 text-xs">
+                
+                <div className="space-y-1">
+                  <label className="text-[#7D8590]">college_full_name</label>
+                  <input
+                    type="text"
+                    required
+                    value={newInstName}
+                    onChange={(e) => setNewInstName(e.target.value)}
+                    placeholder="e.g. COEP Technological University"
+                    className="w-full bg-[#0B0E11] border border-[#21262D] rounded px-3 py-2 text-[#E6EDF3] focus:outline-none focus:border-[#4FA8E0]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[#7D8590]">required_email_domain</label>
+                  <div className="relative">
+                    <Globe className="w-3.5 h-3.5 absolute left-3 top-3 text-[#7D8590]" />
+                    <input
+                      type="text"
+                      required
+                      value={newInstDomain}
+                      onChange={(e) => setNewInstDomain(e.target.value)}
+                      placeholder="e.g. coep.ac.in"
+                      className="w-full bg-[#0B0E11] border border-[#21262D] rounded pl-9 pr-3 py-2 text-[#E6EDF3] placeholder-[#7D8590] focus:outline-none focus:border-[#4FA8E0]"
+                    />
+                  </div>
+                  <span className="text-[10px] text-[#7D8590]">Students must register using an email ending with this domain.</span>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isAddingInst}
+                  className="w-full py-2.5 rounded bg-[#4FA8E0] text-[#0B0E11] font-bold text-xs hover:bg-[#4FA8E0]/90 transition-colors flex items-center justify-center space-x-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>[ONBOARD_INSTITUTION]</span>
+                </button>
+
+              </form>
+            </div>
+          </div>
+
+          {/* Onboarded Colleges List */}
+          <div className="lg:col-span-7 space-y-4">
+            <div className="text-xs text-[#7D8590]">// ONBOARDED_INSTITUTIONS ({institutionsList.length})</div>
+
+            <div className="space-y-3 max-h-[600px] overflow-y-auto">
+              {institutionsList.map(inst => (
+                <div key={inst.id} className="judge-card p-4 space-y-1 text-xs flex items-center justify-between border-l-4 border-l-[#4FA8E0]">
+                  <div>
+                    <h3 className="font-bold text-[#E6EDF3] text-sm">{inst.name}</h3>
+                    <div className="text-[#7D8590] text-[11px] font-mono">
+                      Domain restriction: <code className="text-[#4FA8E0]">@{inst.email_domain.replace(/^@/, '')}</code>
+                    </div>
+                  </div>
+
+                  <span className="text-[10px] font-bold text-[#3FB950] bg-[#3FB950]/10 border border-[#3FB950]/30 px-2 py-0.5 rounded">
+                    [ACTIVE]
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
 

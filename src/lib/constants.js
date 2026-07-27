@@ -1,4 +1,28 @@
-export const ALLOWED_EMAIL_DOMAIN = import.meta.env.VITE_ALLOWED_EMAIL_DOMAIN || '@mitaoe.ac.in';
+export const DEFAULT_EMAIL_DOMAIN = import.meta.env.VITE_ALLOWED_EMAIL_DOMAIN || '@mitaoe.ac.in';
+
+export const DEFAULT_INSTITUTIONS = [
+  {
+    id: 'mitaoe-default',
+    name: 'MIT Academy of Engineering',
+    email_domain: 'mitaoe.ac.in',
+    logo_url: null,
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'coep-default',
+    name: 'COEP Technological University',
+    email_domain: 'coep.ac.in',
+    logo_url: null,
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'pict-default',
+    name: 'Pune Institute of Computer Technology',
+    email_domain: 'pict.edu',
+    logo_url: null,
+    created_at: new Date().toISOString()
+  }
+];
 
 export const LANGUAGES = [
   { id: 'cpp', name: 'C++ (GCC)', pistonLang: 'cpp', pistonVersion: '10.2.0', monacoLang: 'cpp' },

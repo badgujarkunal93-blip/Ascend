@@ -5,18 +5,20 @@ import { useAuth } from '../../context/AuthContext';
 export default function ProtectedRoute({ children, requireAdmin = false }) {
   const { user, profile, loading, showToast } = useAuth();
 
+  const isAnyAdmin = profile?.role === 'superadmin' || profile?.role === 'institution_admin' || profile?.role === 'admin';
+
   useEffect(() => {
-    if (!loading && user && requireAdmin && profile?.role !== 'admin') {
+    if (!loading && user && requireAdmin && !isAnyAdmin) {
       showToast('Access Restricted: Admin privileges required.', 'error');
     }
-  }, [loading, user, requireAdmin, profile]);
+  }, [loading, user, requireAdmin, isAnyAdmin]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#090d16]">
+      <div className="min-h-screen flex items-center justify-center bg-[#0B0E11] font-mono">
         <div className="flex flex-col items-center space-y-4">
-          <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-slate-400 text-sm font-medium">Loading session...</p>
+          <div className="w-8 h-8 border-2 border-[#3FB950] border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-[#7D8590] text-xs">// LOADING_SESSION...</p>
         </div>
       </div>
     );
@@ -26,7 +28,7 @@ export default function ProtectedRoute({ children, requireAdmin = false }) {
     return <Navigate to="/auth" replace />;
   }
 
-  if (requireAdmin && profile?.role !== 'admin') {
+  if (requireAdmin && !isAnyAdmin) {
     return <Navigate to="/" replace />;
   }
 

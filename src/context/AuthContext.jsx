@@ -21,7 +21,7 @@ import {
   serverTimestamp 
 } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from '../lib/firebase';
-import { ALLOWED_EMAIL_DOMAIN, MOCK_QUESTIONS } from '../lib/constants';
+import { DEFAULT_INSTITUTIONS, MOCK_QUESTIONS } from '../lib/constants';
 
 const AuthContext = createContext();
 
@@ -29,8 +29,9 @@ const MOCK_ROSTER = [
   {
     id: 'demo-student-id',
     full_name: 'Alex Student',
-    email: `student${ALLOWED_EMAIL_DOMAIN}`,
+    email: 'student@mitaoe.ac.in',
     role: 'student',
+    institution_id: 'mitaoe-default',
     streak_count: 5,
     last_pass_date: new Date().toISOString().split('T')[0],
     solved_count: 3
@@ -38,8 +39,9 @@ const MOCK_ROSTER = [
   {
     id: 'student-2',
     full_name: 'Rohan Verma',
-    email: `rohan${ALLOWED_EMAIL_DOMAIN}`,
+    email: 'rohan@mitaoe.ac.in',
     role: 'student',
+    institution_id: 'mitaoe-default',
     streak_count: 2,
     last_pass_date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
     solved_count: 2
@@ -47,8 +49,9 @@ const MOCK_ROSTER = [
   {
     id: 'student-3',
     full_name: 'Priya Sharma',
-    email: `priya${ALLOWED_EMAIL_DOMAIN}`,
+    email: 'priya@mitaoe.ac.in',
     role: 'student',
+    institution_id: 'mitaoe-default',
     streak_count: 0,
     last_pass_date: new Date(Date.now() - 172800000).toISOString().split('T')[0],
     solved_count: 1
@@ -56,8 +59,9 @@ const MOCK_ROSTER = [
   {
     id: 'student-4',
     full_name: 'Siddharth Patel (Skipped 4 Days)',
-    email: `siddharth${ALLOWED_EMAIL_DOMAIN}`,
+    email: 'siddharth@mitaoe.ac.in',
     role: 'student',
+    institution_id: 'mitaoe-default',
     streak_count: 0,
     last_pass_date: new Date(Date.now() - 345600000).toISOString().split('T')[0],
     solved_count: 0
@@ -68,6 +72,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [institutionsList, setInstitutionsList] = useState(DEFAULT_INSTITUTIONS);
   const [questionsList, setQuestionsList] = useState(MOCK_QUESTIONS);
   const [userSubmissions, setUserSubmissions] = useState([]);
   const [studentRoster, setStudentRoster] = useState(MOCK_ROSTER);
@@ -81,7 +86,7 @@ export const AuthProvider = ({ children }) => {
     setToastMessage(null);
   };
 
-  // Helper to calculate exact consecutive daily streak
+  // Calculate dynamic streak
   const calculateStreak = (submissions) => {
     if (!submissions || submissions.length === 0) return 0;
     
@@ -120,17 +125,95 @@ export const AuthProvider = ({ children }) => {
     return streak;
   };
 
-  // Fetch student roster for admin view
-  const fetchStudentRoster = async () => {
+  // Fetch institutions from Firestore with real-time listener
+  useEffect(() => {
+    if (!isFirebaseConfigured || !db) return;
+
+    const q = query(collection(db, 'institutions'), orderBy('name', 'asc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const loadedInsts = snapshot.docs.map(docSnap => ({
+          id: docSnap.id,
+          ...docSnap.data()
+        }));
+        setInstitutionsList(loadedInsts);
+      }
+    }, (err) => {
+      console.error('Error listening to institutions:', err);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Add new institution (superadmin only)
+  const addInstitution = async (name, emailDomain) => {
+    const cleanDomain = emailDomain.trim().toLowerCase().replace(/^@/, '');
+    const cleanName = name.trim();
+
+    if (!cleanName || !cleanDomain) {
+      showToast('Name and valid email domain are required.', 'error');
+      return;
+    }
+
     if (!isFirebaseConfigured || !db) {
-      setStudentRoster(MOCK_ROSTER);
+      const newInst = {
+        id: `inst-${Date.now()}`,
+        name: cleanName,
+        email_domain: cleanDomain,
+        logo_url: null,
+        created_at: new Date().toISOString()
+      };
+      setInstitutionsList(prev => [...prev, newInst]);
+      showToast(`Institution "${cleanName}" added (Demo Mode).`, 'success');
+      return newInst;
+    }
+
+    try {
+      const docRef = await addDoc(collection(db, 'institutions'), {
+        name: cleanName,
+        email_domain: cleanDomain,
+        logo_url: null,
+        created_at: serverTimestamp()
+      });
+
+      const newInst = { id: docRef.id, name: cleanName, email_domain: cleanDomain };
+      showToast(`College "${cleanName}" onboarded successfully!`, 'success');
+      return newInst;
+    } catch (err) {
+      console.error('Error adding institution:', err);
+      showToast(`Failed to add college: ${err.message}`, 'error');
+      throw err;
+    }
+  };
+
+  // Fetch student roster for institution_admin or superadmin
+  const fetchStudentRoster = async (targetInstitutionId = null) => {
+    const instId = targetInstitutionId || profile?.institution_id;
+
+    if (!isFirebaseConfigured || !db) {
+      if (instId) {
+        setStudentRoster(MOCK_ROSTER.filter(s => s.institution_id === instId));
+      } else {
+        setStudentRoster(MOCK_ROSTER);
+      }
       return;
     }
 
     try {
-      const rosterQuery = query(collection(db, 'profiles'), where('role', '==', 'student'));
-      const rosterSnap = await getDocs(rosterQuery);
+      let rosterQuery;
+      if (profile?.role === 'superadmin' && !instId) {
+        rosterQuery = query(collection(db, 'profiles'), where('role', '==', 'student'));
+      } else if (instId) {
+        rosterQuery = query(
+          collection(db, 'profiles'), 
+          where('role', '==', 'student'),
+          where('institution_id', '==', instId)
+        );
+      } else {
+        rosterQuery = query(collection(db, 'profiles'), where('role', '==', 'student'));
+      }
 
+      const rosterSnap = await getDocs(rosterQuery);
       const subSnap = await getDocs(collection(db, 'submissions'));
       const submissionsData = subSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
@@ -155,7 +238,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Remove / Drop inactive student
+  // Remove / Drop student from batch
   const removeStudent = async (studentId) => {
     setStudentRoster(prev => prev.filter(s => s.id !== studentId));
 
@@ -172,7 +255,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Fetch user profile & submissions from Firestore
+  // Fetch user profile & submissions
   const fetchUserProfile = async (userId) => {
     if (!isFirebaseConfigured || !db || !userId) return;
 
@@ -189,13 +272,20 @@ export const AuthProvider = ({ children }) => {
       const computedStreak = calculateStreak(submissions);
 
       if (profData) {
-        setProfile({
+        // Ensure legacy profiles have institution_id default
+        const updatedProf = {
           ...profData,
+          institution_id: profData.institution_id || 'mitaoe-default',
           streak_count: computedStreak
-        });
+        };
 
-        if (profData.streak_count !== computedStreak) {
-          await updateDoc(profRef, { streak_count: computedStreak });
+        setProfile(updatedProf);
+
+        if (profData.streak_count !== computedStreak || !profData.institution_id) {
+          await updateDoc(profRef, { 
+            streak_count: computedStreak,
+            institution_id: updatedProf.institution_id
+          });
         }
       }
     } catch (err) {
@@ -204,21 +294,45 @@ export const AuthProvider = ({ children }) => {
   };
 
   const loginDemoUser = (role = 'student') => {
-    const isStudent = role === 'student';
-    const demoUser = {
-      uid: isStudent ? 'demo-student-id' : 'demo-admin-id',
-      email: isStudent ? `student${ALLOWED_EMAIL_DOMAIN}` : `admin${ALLOWED_EMAIL_DOMAIN}`
-    };
-    const demoProfile = {
-      id: demoUser.uid,
-      email: demoUser.email,
-      full_name: isStudent ? 'Alex Student (Demo)' : 'Senior Instructor (Admin Demo)',
-      role: isStudent ? 'student' : 'admin',
-      streak_count: isStudent ? 5 : 12,
-      last_pass_date: new Date().toISOString().split('T')[0],
-      created_at: new Date().toISOString()
-    };
+    let demoProfile;
+    const defaultInst = institutionsList[0] || DEFAULT_INSTITUTIONS[0];
 
+    if (role === 'superadmin') {
+      demoProfile = {
+        id: 'demo-superadmin-id',
+        email: `superadmin@${defaultInst.email_domain}`,
+        full_name: 'Global Curator (Superadmin)',
+        role: 'superadmin',
+        institution_id: defaultInst.id,
+        streak_count: 15,
+        last_pass_date: new Date().toISOString().split('T')[0],
+        created_at: new Date().toISOString()
+      };
+    } else if (role === 'institution_admin') {
+      demoProfile = {
+        id: 'demo-inst-admin-id',
+        email: `inst_admin@${defaultInst.email_domain}`,
+        full_name: `${defaultInst.name} Admin`,
+        role: 'institution_admin',
+        institution_id: defaultInst.id,
+        streak_count: 8,
+        last_pass_date: new Date().toISOString().split('T')[0],
+        created_at: new Date().toISOString()
+      };
+    } else {
+      demoProfile = {
+        id: 'demo-student-id',
+        email: `student@${defaultInst.email_domain}`,
+        full_name: 'Alex Student (Demo)',
+        role: 'student',
+        institution_id: defaultInst.id,
+        streak_count: 5,
+        last_pass_date: new Date().toISOString().split('T')[0],
+        created_at: new Date().toISOString()
+      };
+    }
+
+    const demoUser = { uid: demoProfile.id, email: demoProfile.email };
     setUser(demoUser);
     setProfile(demoProfile);
     showToast(`Logged in as ${demoProfile.full_name} (${demoProfile.role.toUpperCase()})`, 'success');
@@ -248,7 +362,7 @@ export const AuthProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  // Fetch questions from Firestore with real-time listener
+  // Fetch questions from Firestore
   useEffect(() => {
     if (!isFirebaseConfigured || !db) return;
 
@@ -268,12 +382,16 @@ export const AuthProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  // Firebase Sign Up with email domain check
-  const signup = async ({ email, password, fullName }) => {
+  // Firebase Sign Up with dynamic institution email_domain check
+  const signup = async ({ email, password, fullName, institutionId }) => {
     const trimmedEmail = email.trim().toLowerCase();
     
-    if (!trimmedEmail.endsWith(ALLOWED_EMAIL_DOMAIN.toLowerCase())) {
-      throw new Error(`Registration restricted: Email must end with ${ALLOWED_EMAIL_DOMAIN}`);
+    const targetInst = institutionsList.find(i => i.id === institutionId) || DEFAULT_INSTITUTIONS[0];
+    const expectedDomain = targetInst.email_domain.toLowerCase().replace(/^@/, '');
+
+    const emailDomain = trimmedEmail.split('@')[1];
+    if (!emailDomain || emailDomain.toLowerCase() !== expectedDomain) {
+      throw new Error(`Registration restricted: Email for ${targetInst.name} must end with @${expectedDomain}`);
     }
 
     if (!isFirebaseConfigured || !auth) {
@@ -283,25 +401,33 @@ export const AuthProvider = ({ children }) => {
         email: trimmedEmail,
         full_name: fullName || trimmedEmail.split('@')[0],
         role: 'student',
+        institution_id: targetInst.id,
         streak_count: 0,
         last_pass_date: null,
         created_at: new Date().toISOString()
       };
       setUser(newUser);
       setProfile(newProf);
-      showToast('Account created successfully (Demo Mode).', 'success');
+      showToast(`Account created for ${targetInst.name} (Demo Mode).`, 'success');
       return { user: newUser, profile: newProf };
     }
 
     const userCred = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
     const newUserId = userCred.user.uid;
-    const initialRole = trimmedEmail.startsWith('admin@') ? 'admin' : 'student';
+
+    let initialRole = 'student';
+    if (trimmedEmail.startsWith('superadmin@')) {
+      initialRole = 'superadmin';
+    } else if (trimmedEmail.startsWith('admin@') || trimmedEmail.startsWith('inst_admin@')) {
+      initialRole = 'institution_admin';
+    }
 
     const newProfileData = {
       id: newUserId,
       email: trimmedEmail,
       full_name: fullName || trimmedEmail.split('@')[0],
       role: initialRole,
+      institution_id: targetInst.id,
       streak_count: 0,
       last_pass_date: null,
       created_at: serverTimestamp()
@@ -310,7 +436,7 @@ export const AuthProvider = ({ children }) => {
     await setDoc(doc(db, 'profiles', newUserId), newProfileData);
     setUser(userCred.user);
     setProfile(newProfileData);
-    showToast('Account created successfully!', 'success');
+    showToast(`Account registered under ${targetInst.name}!`, 'success');
     return userCred;
   };
 
@@ -319,8 +445,13 @@ export const AuthProvider = ({ children }) => {
     const trimmedEmail = email.trim().toLowerCase();
 
     if (!isFirebaseConfigured || !auth) {
-      const isAdmin = trimmedEmail.includes('admin');
-      loginDemoUser(isAdmin ? 'admin' : 'student');
+      if (trimmedEmail.startsWith('superadmin@')) {
+        loginDemoUser('superadmin');
+      } else if (trimmedEmail.startsWith('admin@')) {
+        loginDemoUser('institution_admin');
+      } else {
+        loginDemoUser('student');
+      }
       return;
     }
 
@@ -330,7 +461,7 @@ export const AuthProvider = ({ children }) => {
     return userCred;
   };
 
-  // Firebase Sign Out
+  // Sign Out
   const logout = async () => {
     if (isFirebaseConfigured && auth) {
       await signOut(auth);
@@ -341,7 +472,7 @@ export const AuthProvider = ({ children }) => {
     showToast('Signed out.', 'info');
   };
 
-  // Record submission in Firestore & update streak
+  // Record submission
   const recordSubmission = async (questionId, verdict, code, language, testResults) => {
     if (!user || !profile) {
       showToast('You must be logged in to submit.', 'error');
@@ -398,7 +529,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Admin Question Handlers (Firestore)
+  // Admin Question Handlers (superadmin only)
   const addQuestion = async (qData) => {
     const postedDate = qData.posted_date || new Date().toISOString().split('T')[0];
 
@@ -421,7 +552,7 @@ export const AuthProvider = ({ children }) => {
       });
 
       const newQuestion = { id: docRef.id, ...qData, posted_date: postedDate };
-      showToast('Question published to batch!', 'success');
+      showToast('Question published globally!', 'success');
       return newQuestion;
     } catch (err) {
       console.error('Error posting question to Firestore:', err);
@@ -467,6 +598,8 @@ export const AuthProvider = ({ children }) => {
       user,
       profile,
       loading,
+      institutionsList,
+      addInstitution,
       loginDemoUser,
       signup,
       login,

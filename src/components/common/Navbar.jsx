@@ -1,12 +1,10 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Terminal, Calendar, ShieldCheck, LogOut, Code2 } from 'lucide-react';
-import { ALLOWED_EMAIL_DOMAIN } from '../../lib/constants';
-import Heatmap from './Heatmap';
+import { Terminal, Calendar, ShieldCheck, LogOut, Code2, Building2 } from 'lucide-react';
 
 export default function Navbar() {
-  const { user, profile, logout } = useAuth();
+  const { user, profile, institutionsList, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -17,19 +15,35 @@ export default function Navbar() {
 
   const isActive = (path) => location.pathname === path;
 
+  const isAnyAdmin = profile?.role === 'superadmin' || profile?.role === 'institution_admin' || profile?.role === 'admin';
+  const currentInst = institutionsList.find(i => i.id === profile?.institution_id) || institutionsList[0];
+  const userDomain = profile?.email ? profile.email.split('@')[1] : (currentInst?.email_domain || 'ascend.edu');
+
+  const getRoleBadge = (role) => {
+    switch (role) {
+      case 'superadmin':
+        return <span className="text-[10px] uppercase text-[#4FA8E0] font-bold">[SUPERADMIN]</span>;
+      case 'institution_admin':
+      case 'admin':
+        return <span className="text-[10px] uppercase text-[#C87DE8] font-bold">[INST_ADMIN]</span>;
+      default:
+        return <span className="text-[10px] uppercase text-[#7D8590]">[STUDENT]</span>;
+    }
+  };
+
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-[#21262D] bg-[#0B0E11]/95 backdrop-blur-sm">
+    <header className="sticky top-0 z-40 w-full border-b border-[#21262D] bg-[#0B0E11]/95 backdrop-blur-sm font-mono">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
         
         {/* Brand logo & tagline - Ascend Monospace */}
         <div className="flex items-center space-x-6">
           <Link to="/" className="flex items-center space-x-2 group">
             <Terminal className="w-5 h-5 text-[#3FB950]" />
-            <span className="font-mono text-sm font-bold tracking-tight text-[#E6EDF3] group-hover:text-[#3FB950] transition-colors">
+            <span className="text-sm font-bold tracking-tight text-[#E6EDF3] group-hover:text-[#3FB950] transition-colors">
               ASCEND://
             </span>
-            <span className="hidden sm:inline-block text-[10px] font-mono text-[#7D8590] border border-[#21262D] px-1.5 py-0.5 rounded-sm">
-              {ALLOWED_EMAIL_DOMAIN.replace('@', '')}
+            <span className="hidden sm:inline-block text-[10px] text-[#7D8590] border border-[#21262D] px-1.5 py-0.5 rounded-sm">
+              {userDomain}
             </span>
           </Link>
 
@@ -38,7 +52,7 @@ export default function Navbar() {
             <nav className="hidden md:flex items-center space-x-1 pl-4 border-l border-[#21262D]">
               <Link
                 to="/"
-                className={`px-3 py-1 text-xs font-mono transition-colors flex items-center space-x-1.5 border-b-2 ${
+                className={`px-3 py-1 text-xs transition-colors flex items-center space-x-1.5 border-b-2 ${
                   isActive('/') 
                     ? 'border-[#3FB950] text-[#E6EDF3] font-bold bg-[#12161B]' 
                     : 'border-transparent text-[#7D8590] hover:text-[#E6EDF3] hover:bg-[#12161B]/50'
@@ -50,7 +64,7 @@ export default function Navbar() {
               
               <Link
                 to="/archive"
-                className={`px-3 py-1 text-xs font-mono transition-colors flex items-center space-x-1.5 border-b-2 ${
+                className={`px-3 py-1 text-xs transition-colors flex items-center space-x-1.5 border-b-2 ${
                   isActive('/archive') 
                     ? 'border-[#3FB950] text-[#E6EDF3] font-bold bg-[#12161B]' 
                     : 'border-transparent text-[#7D8590] hover:text-[#E6EDF3] hover:bg-[#12161B]/50'
@@ -60,10 +74,10 @@ export default function Navbar() {
                 <span>Archive</span>
               </Link>
 
-              {profile?.role === 'admin' && (
+              {isAnyAdmin && (
                 <Link
                   to="/admin"
-                  className={`px-3 py-1 text-xs font-mono transition-colors flex items-center space-x-1.5 border-b-2 ${
+                  className={`px-3 py-1 text-xs transition-colors flex items-center space-x-1.5 border-b-2 ${
                     isActive('/admin') 
                       ? 'border-[#C87DE8] text-[#C87DE8] font-bold bg-[#12161B]' 
                       : 'border-transparent text-[#7D8590] hover:text-[#C87DE8] hover:bg-[#12161B]/50'
@@ -77,23 +91,18 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Right Actions & Heatmap */}
+        {/* Right Actions */}
         <div className="flex items-center space-x-4">
           
           {user ? (
             <>
-              {/* Contribution Activity Heatmap */}
-              <Heatmap />
-
               {/* User Profile Info */}
               <div className="flex items-center space-x-3 pl-3 border-l border-[#21262D]">
-                <div className="hidden sm:flex flex-col text-right font-mono">
+                <div className="hidden sm:flex flex-col text-right">
                   <span className="text-xs text-[#E6EDF3] truncate max-w-[140px]">
                     {profile?.full_name || user.email}
                   </span>
-                  <span className={`text-[10px] uppercase ${profile?.role === 'admin' ? 'text-[#C87DE8]' : 'text-[#7D8590]'}`}>
-                    [{profile?.role || 'student'}]
-                  </span>
+                  {getRoleBadge(profile?.role)}
                 </div>
 
                 <button
