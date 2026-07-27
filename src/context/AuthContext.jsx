@@ -47,23 +47,33 @@ const MOCK_ROSTER = [
     solved_count: 2
   },
   {
-    id: 'student-3',
-    full_name: 'Priya Sharma',
-    email: 'priya@mitaoe.ac.in',
+    id: 'student-coep-1',
+    full_name: 'Aditya Deshmukh (COEP)',
+    email: 'aditya@coep.ac.in',
     role: 'student',
-    institution_id: 'mitaoe-default',
-    streak_count: 0,
-    last_pass_date: new Date(Date.now() - 172800000).toISOString().split('T')[0],
+    institution_id: 'coep-default',
+    streak_count: 4,
+    last_pass_date: new Date().toISOString().split('T')[0],
+    solved_count: 3
+  },
+  {
+    id: 'student-coep-2',
+    full_name: 'Tanvi Joshi (COEP)',
+    email: 'tanvi@coep.ac.in',
+    role: 'student',
+    institution_id: 'coep-default',
+    streak_count: 1,
+    last_pass_date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
     solved_count: 1
   },
   {
-    id: 'student-4',
-    full_name: 'Siddharth Patel (Skipped 4 Days)',
-    email: 'siddharth@mitaoe.ac.in',
+    id: 'student-coep-3',
+    full_name: 'Kunal Kulkarni (COEP - Skipped 3 Days)',
+    email: 'kunal@coep.ac.in',
     role: 'student',
-    institution_id: 'mitaoe-default',
+    institution_id: 'coep-default',
     streak_count: 0,
-    last_pass_date: new Date(Date.now() - 345600000).toISOString().split('T')[0],
+    last_pass_date: new Date(Date.now() - 259200000).toISOString().split('T')[0],
     solved_count: 0
   }
 ];
